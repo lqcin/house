@@ -292,6 +292,17 @@ tbody td{padding:12px 16px;font-size:13px;}
 .hatr-btn.aranmadi:hover{background:rgba(255,255,255,.05);}
 .hatr-durum{font-size:10px;font-weight:600;letter-spacing:.5px;padding:3px 8px;}
 
+/* VARDİYA */
+.vardiya-bar{background:#1a1d23;border-bottom:2px solid var(--primary);padding:8px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.vardiya-bar.aktif{background:#0f2b0f;border-bottom-color:var(--green);}
+.vardiya-bilgi{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.vardiya-durum{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.5);}
+.vardiya-durum.aktif{color:#4ade80;}
+.vardiya-sure{font-size:12px;color:rgba(255,255,255,.6);font-variant-numeric:tabular-nums;}
+.vardiya-ozet{display:flex;gap:14px;flex-wrap:wrap;}
+.vardiya-stat{font-size:11px;color:rgba(255,255,255,.5);}
+.vardiya-stat span{color:#fff;font-weight:600;}
+
 /* RESPONSIVE */
 @media(max-width:900px){.rooms-stats{grid-template-columns:repeat(2,1fr);}}
 /* ── CROSS-PLATFORM MOBİL ── */
@@ -402,7 +413,7 @@ input[type="number"], input[type="date"], input[type="password"] {
     </div>
 
     <div class="form-row">
-      <div class="form-group"><label>Ad Soyad *</label><input type="text" id="ci_ad" placeholder="Ad Soyad"></div>
+      <div class="form-group"><label>Ad Soyad *</label><input type="text" id="ci_ad" placeholder="Ad Soyad" oninput="adDegistiKontrol()"></div>
       <div class="form-group"><label>Telefon</label><input type="tel" id="ci_tel" placeholder="05XX XXX XX XX" inputmode="tel"></div>
     </div>
     <div class="form-row">
@@ -887,6 +898,59 @@ input[type="number"], input[type="date"], input[type="password"] {
   </div>
 </div>
 
+<!-- VARDİYA BAR -->
+<div id="vardiyaBar" class="vardiya-bar" style="display:none">
+  <div class="vardiya-bilgi">
+    <div class="vardiya-durum aktif">● Vardiya Aktif</div>
+    <div class="vardiya-sure" id="vardiyaSure">00:00:00</div>
+    <div class="vardiya-ozet">
+      <div class="vardiya-stat">Check-in: <span id="vd-checkin">0</span></div>
+      <div class="vardiya-stat">Check-out: <span id="vd-checkout">0</span></div>
+      <div class="vardiya-stat">Rezervasyon: <span id="vd-rezerv">0</span></div>
+      <div class="vardiya-stat">Tahsilat: <span id="vd-tahsilat">0 ₺</span></div>
+    </div>
+  </div>
+  <button class="btn btn-danger btn-sm" onclick="vardiyaBitir()">Vardiayı Bitir</button>
+</div>
+
+<!-- VARDİYA BAŞLAT MODAL -->
+<div class="modal-overlay" id="vardiyaBaslatModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">Vardiya Başlat</div>
+    <div style="background:var(--parchment);border:1px solid var(--border);padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--muted)">
+      Vardiyaya başlamadan önce kasadaki nakit miktarını sayın ve girin.
+    </div>
+    <div class="form-group">
+      <label>Kasadaki Nakit (Devir) ₺</label>
+      <input type="number" id="vardiya_nakit" placeholder="0" inputmode="decimal" style="font-size:18px;font-weight:600;text-align:right">
+    </div>
+    <div class="form-group">
+      <label>Not (isteğe bağlı)</label>
+      <input type="text" id="vardiya_not" placeholder="Önceki vardiyadan not...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('vardiyaBaslatModal')">Vazgeç</button>
+      <button class="btn btn-primary" onclick="vardiyaBaslat()">✓ Vardiayı Başlat</button>
+    </div>
+  </div>
+</div>
+
+<!-- VARDİYA BİTİR MODAL -->
+<div class="modal-overlay" id="vardiyaBitirModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title">Vardiya Özeti</div>
+    <div id="vardiyaBitirIcerik"></div>
+    <div class="form-group" style="margin-top:14px">
+      <label>Kasadaki Nakit (Sayım) ₺</label>
+      <input type="number" id="vardiya_bitis_nakit" placeholder="0" inputmode="decimal" style="font-size:18px;font-weight:600;text-align:right">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('vardiyaBitirModal')">İptal</button>
+      <button class="btn btn-primary" onclick="vardiyaKapat()">✓ Vardiayı Kapat</button>
+    </div>
+  </div>
+</div>
+
 <div class="content">
 
 <!-- ODALAR SAYFASI -->
@@ -894,6 +958,7 @@ input[type="number"], input[type="date"], input[type="password"] {
   <div class="section-head">
     <h2>Oda <em>Durumları</em></h2>
     <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost" id="vardiyaBtn" onclick="vardiyaAc()">⏱ Vardiya Başlat</button>
       <button class="btn btn-ghost" onclick="openModal('harcamaModal')">💸 Harcama Gir</button>
       <button class="btn btn-primary" onclick="openModal('rezervModal')">+ Rezervasyon</button>
     </div>
@@ -1333,6 +1398,118 @@ window.odaKliklandi = function(no) {
   }
 };
 
+// ── VARDİYA SİSTEMİ ──
+let vardiyaAktif = false;
+let vardiyaBaslangic = null;
+let vardiyaSayacInterval = null;
+let vardiyaId = null;
+let vardiyaIstatistik = {checkin:0, checkout:0, rezervasyon:0, tahsilat:0};
+
+window.vardiyaAc = function() {
+  if(vardiyaAktif) {
+    toast('Zaten aktif bir vardiya var','error');
+    return;
+  }
+  document.getElementById('vardiya_nakit').value = '';
+  document.getElementById('vardiya_not').value = '';
+  openModal('vardiyaBaslatModal');
+};
+
+window.vardiyaBaslat = async function() {
+  const nakit = Number(document.getElementById('vardiya_nakit').value) || 0;
+  const not_  = document.getElementById('vardiya_not').value.trim();
+  const now   = nowISO();
+  vardiyaBaslangic = new Date();
+  vardiyaIstatistik = {checkin:0, checkout:0, rezervasyon:0, tahsilat:0};
+
+  const ref = await addDoc(collection(db,'vardiyalar'), {
+    baslangic: now,
+    nakitDevir: nakit,
+    not: not_,
+    kim: auth.currentUser?.email || 'resepsiyon',
+    durum: 'aktif'
+  });
+  vardiyaId = ref.id;
+  vardiyaAktif = true;
+
+  document.getElementById('vardiyaBar').style.display = 'flex';
+  document.getElementById('vardiyaBtn').textContent = '⏱ Vardiya Aktif';
+  document.getElementById('vardiyaBtn').disabled = true;
+  closeModal('vardiyaBaslatModal');
+  toast('Vardiya başlatıldı ✓', 'success');
+
+  vardiyaSayacInterval = setInterval(vardiyaSayacGuncelle, 1000);
+  await logAktivite('vardiya_baslat', `Nakit devir: ${nakit.toLocaleString('tr-TR')} ₺`, '');
+};
+
+function vardiyaSayacGuncelle() {
+  if(!vardiyaBaslangic) return;
+  const fark = Math.floor((new Date() - vardiyaBaslangic) / 1000);
+  const s = Math.floor(fark/3600);
+  const d = Math.floor((fark%3600)/60);
+  const sn = fark%60;
+  const el = document.getElementById('vardiyaSure');
+  if(el) el.textContent = `${String(s).padStart(2,'0')}:${String(d).padStart(2,'0')}:${String(sn).padStart(2,'0')}`;
+}
+
+// Vardiya istatistiğini güncelle (saveCheckin/saveCheckout çağırır)
+function vardiyaIstatistikGuncelle(tip, tutar=0) {
+  if(!vardiyaAktif) return;
+  if(tip==='checkin') vardiyaIstatistik.checkin++;
+  if(tip==='checkout') { vardiyaIstatistik.checkout++; vardiyaIstatistik.tahsilat += tutar; }
+  if(tip==='rezervasyon') vardiyaIstatistik.rezervasyon++;
+  // UI güncelle
+  document.getElementById('vd-checkin').textContent = vardiyaIstatistik.checkin;
+  document.getElementById('vd-checkout').textContent = vardiyaIstatistik.checkout;
+  document.getElementById('vd-rezerv').textContent = vardiyaIstatistik.rezervasyon;
+  document.getElementById('vd-tahsilat').textContent = vardiyaIstatistik.tahsilat.toLocaleString('tr-TR') + ' ₺';
+}
+
+window.vardiyaBitir = function() {
+  if(!vardiyaAktif) return;
+  const fark = Math.floor((new Date() - vardiyaBaslangic) / 1000);
+  const sure = `${Math.floor(fark/3600)}s ${Math.floor((fark%3600)/60)}dk`;
+  document.getElementById('vardiyaBitirIcerik').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      ${[
+        ['Vardiya Süresi', sure],
+        ['Check-in', vardiyaIstatistik.checkin + ' işlem'],
+        ['Check-out', vardiyaIstatistik.checkout + ' işlem'],
+        ['Rezervasyon', vardiyaIstatistik.rezervasyon + ' işlem'],
+        ['Toplam Tahsilat', vardiyaIstatistik.tahsilat.toLocaleString('tr-TR') + ' ₺'],
+      ].map(([k,v])=>`<div style="background:var(--parchment);border:1px solid var(--border);padding:10px 14px">
+        <div style="font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px">${k}</div>
+        <div style="font-size:14px;font-weight:700;color:var(--dark)">${v}</div>
+      </div>`).join('')}
+    </div>`;
+  document.getElementById('vardiya_bitis_nakit').value = '';
+  openModal('vardiyaBitirModal');
+};
+
+window.vardiyaKapat = async function() {
+  const nakitSayim = Number(document.getElementById('vardiya_bitis_nakit').value) || 0;
+  const now = nowISO();
+  if(vardiyaId) {
+    await updateDoc(doc(db,'vardiyalar',vardiyaId), {
+      bitis: now,
+      nakitSayim,
+      istatistik: vardiyaIstatistik,
+      sure: Math.floor((new Date()-vardiyaBaslangic)/1000),
+      durum: 'kapali'
+    });
+  }
+  clearInterval(vardiyaSayacInterval);
+  vardiyaAktif = false;
+  vardiyaBaslangic = null;
+  vardiyaId = null;
+  document.getElementById('vardiyaBar').style.display = 'none';
+  document.getElementById('vardiyaBtn').textContent = '⏱ Vardiya Başlat';
+  document.getElementById('vardiyaBtn').disabled = false;
+  closeModal('vardiyaBitirModal');
+  await logAktivite('vardiya_kapat', `Nakit sayım: ${nakitSayim.toLocaleString('tr-TR')} ₺ · Tahsilat: ${vardiyaIstatistik.tahsilat.toLocaleString('tr-TR')} ₺`, '');
+  toast('Vardiya kapatıldı ✓', 'success');
+};
+
 // ── SÖZLEŞME & CHECK-IN ──
 window.checkinSozlesmeOnayla = function() {
   const no    = currentCheckinOda;
@@ -1466,12 +1643,18 @@ function tcDogrula(tc) {
 
 // TC Arama
 window.tcAra = async function(tc) {
-  if(tc.length !== 11) { document.getElementById('musteriBulundu').style.display='none'; return; }
-  // Algoritma kontrolü
   const tcEl = document.getElementById('ci_tc');
+  const uyariEl = document.getElementById('tc_uyari');
+  if(uyariEl) uyariEl.remove();
+  if(tc.length !== 11) {
+    document.getElementById('musteriBulundu').style.display='none';
+    tcEl.style.borderColor='';
+    return;
+  }
   if(!tcDogrula(tc)) {
     tcEl.style.borderColor = 'var(--red)';
     document.getElementById('musteriBulundu').style.display='none';
+    toast('TC Kimlik No geçersiz','error');
     return;
   }
   tcEl.style.borderColor = 'var(--green)';
@@ -1486,11 +1669,28 @@ window.tcAra = async function(tc) {
       document.getElementById('ci_plaka').value = m.plaka || '';
       document.getElementById('mb-ad').textContent = `${m.ad} — Kayıtlı Müşteri`;
       document.getElementById('mb-meta').textContent = `${m.konaklamaSayisi||0} kez konaklamış · Son: ${m.sonKonaklama||'—'}`;
-      document.getElementById('musteriBulundu').style.display = 'block';
+      document.getElementById('musteriBulundu').style.display = 'flex';
+      document.getElementById('ci_ad').dataset.kayitliAd = m.ad || '';
     } else {
       document.getElementById('musteriBulundu').style.display = 'none';
+      document.getElementById('ci_ad').dataset.kayitliAd = '';
     }
   } catch(e) {}
+};
+
+window.adDegistiKontrol = function() {
+  const ad = document.getElementById('ci_ad').value.trim();
+  const kayitliAd = document.getElementById('ci_ad').dataset.kayitliAd || '';
+  const eski = document.getElementById('tc_uyari');
+  if(eski) eski.remove();
+  if(!kayitliAd || !ad) return;
+  if(ad.toLowerCase() !== kayitliAd.toLowerCase()) {
+    const uyari = document.createElement('div');
+    uyari.id = 'tc_uyari';
+    uyari.style.cssText = 'background:#fff0f2;border:1px solid #f5c6cb;padding:8px 12px;font-size:12px;color:#C8102E;margin-bottom:10px;display:flex;align-items:center;gap:6px;border-radius:3px;';
+    uyari.innerHTML = `⚠ <span>Bu TC ile sistemde kayıtlı kişi: <strong>${kayitliAd}</strong> — Girdiğiniz isim farklı, kontrol edin.</span>`;
+    document.getElementById('ci_ad').insertAdjacentElement('afterend', uyari);
+  }
 };
 
 window.tcTemizle = function() {
@@ -1557,6 +1757,7 @@ window.saveCheckin = async function() {
 
   renderOdalar();
   closeModal('checkinModal');
+  vardiyaIstatistikGuncelle('checkin');
   await logAktivite('checkin', `${ad} · ${gece} gece · ${getTipAd(fiyatTip)} · ${fmt(toplam)}`, no);
   toast(`Oda ${no} — Check-in ✓ ${toplam>0?fmt(toplam)+' gelir kaydedildi':''}`, 'success');
 };
@@ -1567,6 +1768,7 @@ window.checkindenRezervasyon = function(rev) {
   document.getElementById('checkinTitle').textContent = `Check-in — Oda ${rev.odaNo} (Rezervasyon)`;
   document.getElementById('ci_tc').value = rev.tc || '';
   document.getElementById('ci_ad').value = rev.misafir || '';
+  document.getElementById('ci_ad').dataset.kayitliAd = '';
   document.getElementById('ci_tel').value = rev.tel || '';
   document.getElementById('ci_email').value = rev.email || '';
   document.getElementById('ci_giris').value = rev.giris || today();
@@ -1577,6 +1779,9 @@ window.checkindenRezervasyon = function(rev) {
   document.getElementById('ci_not').value = rev.not || '';
   document.getElementById('ci_saat').value = new Date().toLocaleTimeString('tr-TR');
   document.getElementById('musteriBulundu').style.display = 'none';
+  clearRefakatciler();
+  const eski = document.getElementById('tc_uyari');
+  if(eski) eski.remove();
 
   const gece = geceSayisi(rev.giris, rev.cikis);
   document.getElementById('ci_gece').value = gece;
@@ -1746,6 +1951,7 @@ window.saveCheckoutFromOzet = async function() {
 
   renderOdalar();
   closeModal('checkoutOzetModal');
+  vardiyaIstatistikGuncelle('checkout', toplam);
   await logAktivite('checkout', `${o.misafir||'?'} · ${gece} gece · Toplam ${fmt(toplam)}`, no);
   toast(`${odaAdi} — Check-out tamamlandı ✓ · ${fmt(toplam)}`, 'success');
 };
