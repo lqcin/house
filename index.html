@@ -6,8 +6,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Swiss House">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#C8102E">
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <title>Swiss House — Giriş</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -295,6 +299,11 @@ function yonlendir(email) {
   } else {
     window.location.href = 'resepsiyon.html';
   }
+}
+
+// Service Worker kaydet
+if('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/house/sw.js').catch(()=>{});
 }
 
 window.doLogin = async function() {
